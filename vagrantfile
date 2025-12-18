@@ -1,0 +1,46 @@
+
+Vagrant.configure("2") do |config|
+  config.vm.define "backup_server" do |backup|
+    backup.vm.box = "ubuntu/focal64"
+    backup.vm.hostname = "backupserver"
+    backup.vm.network "private_network", ip: "192.168.56.10"
+    backup.vm.provider "virtualbox" do |vb|
+      vb.memory = "512"
+      vb.name = "backup_server"
+    end
+
+    backup.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get install -y software-properties-common openssh-server
+      add-apt-repository -y ppa:borgbackup/ppa
+      apt-get update
+      apt-get install -y borgbackup
+      mkdir -p /var/backup
+      chown vagrant:vagrant /var/backup
+      # Разрешаем SSH доступ по паролю для пользователя vagrant
+      sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+      sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
+      systemctl restart sshd
+      # Устанавливаем пароль для vagrant (на всякий случай)
+      echo "vagrant:vagrant" | chpasswd
+    SHELL
+  end
+
+  config.vm.define "client" do |client|
+    client.vm.box = "ubuntu/focal64"
+    client.vm.hostname = "client"
+    client.vm.network "private_network", ip: "192.168.56.20"
+    client.vm.provider "virtualbox" do |vb|
+      vb.memory = "1024"
+      vb.name = "client"
+    end
+
+    client.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get install -y software-properties-common sshpass
+      add-apt-repository -y ppa:borgbackup/ppa
+      apt-get update
+      apt-get install -y borgbackup
+    SHELL
+  end
+end
